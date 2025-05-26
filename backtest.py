@@ -1,21 +1,23 @@
-# backtest.py
 import pandas as pd
 
 def backtest_strategy(df, initial_cash=10000):
     df = df.copy()
-    df['Daily_Return'] = df['Close'].pct_change()
-    df['Strategy_Return'] = df['Daily_Return'] * df['Signal'].shift(1)
-    df['Portfolio_Value'] = (1 + df['Strategy_Return']).cumprod() * initial_cash
+    df['Signal'].fillna(0, inplace=True)
+    df['Position'].fillna(0, inplace=True)
+
+    df['Holdings'] = df['Signal'] * df['Close']
+    df['Cash'] = initial_cash - (df['Position'] * df['Close']).cumsum()
+    df['Portfolio_Value'] = df['Cash'] + df['Holdings']
+    df['Returns'] = df['Portfolio_Value'].pct_change().fillna(0)
+
+    final_value = df['Portfolio_Value'].iloc[-1]
+    total_return = ((final_value - initial_cash) / initial_cash) * 100
+    max_drawdown = ((df['Portfolio_Value'].cummax() - df['Portfolio_Value']) / df['Portfolio_Value'].cummax()).max() * 100
 
     stats = {
-        "Final Portfolio Value": df['Portfolio_Value'].iloc[-1],
-        "Total Return (%)": ((df['Portfolio_Value'].iloc[-1] / initial_cash) - 1) * 100,
-        "Max Drawdown (%)": max_drawdown(df['Portfolio_Value']),
+        "Final Portfolio Value": final_value,
+        "Total Return (%)": total_return,
+        "Max Drawdown (%)": max_drawdown
     }
 
     return df, stats
-
-def max_drawdown(series):
-    roll_max = series.cummax()
-    drawdown = (series - roll_max) / roll_max
-    return drawdown.min() * 100
